@@ -96,6 +96,7 @@ class Board(object):
 		"""
 
 #		TODO: display method needs SERIOUS overhaul
+		# TODO: This method is not displaying correctly
 
 		# Define the size of the border regions (must be big enough for all
 		# header/sider digits, plus a spacer character)
