@@ -141,8 +141,32 @@ class Ship(object):
 		hitsRemaining = self.hits.count(0)
 		return (hitsRemaining, hitsTaken)
 
+	def coordStatus(self,coord):
+		"""
+		Accepts a coordinate and returns the status of that coordinate on the ship
 
-###########################
+		Raises an exception InvalidCoord if the coordinate is not on the ship
+		or invalid.
+
+		:param coord: Tuple of row/col coordinate to interrogate
+		:return: Dictionary of information about that coordinate on the ship:
+			{i: integer index of the position on the ship,
+			 hit: Boolean indicating if this position has been hit}
+		"""
+
+		# Find the coord in the ship
+		# TODO: Validate coord (tuple of 2 integers, etc)
+		try:
+			i = self.coords.index(coord)
+		except ValueError:
+			raise InvalidCoord("Coordinate ({},{}) is not on ship {}".format(coord[0],coord[1],self.name))
+
+		hit = self.hits[i]
+
+		return {"i": i, "hit": hit}
+
+
+	###########################
 # Ship Subclasses
 ###########################
 class Battleship(Ship):
@@ -195,6 +219,16 @@ class HitDuplicate(Exception):
 
 class InvalidBoardIDLength(Exception):
 	def __init__(self,value):
+		self.value = value
+	def __str__(self):
+		return repr(self.value)
+
+class InvalidCoord(Exception):
+	"""
+	Class for raising error when interrogating a ship about a coordinate that is
+	invalid (not on ship, non-numeric/integer, etc.)
+	"""
+	def __init__(self, value):
 		self.value = value
 	def __str__(self):
 		return repr(self.value)
