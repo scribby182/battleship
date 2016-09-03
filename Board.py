@@ -75,7 +75,7 @@ class Board(object):
 
 
 
-	def display(self, boardView, shipView):
+	def display(self, boardView, shipView, debug = False):
 		"""
 		Method to generate a string showing the status of the board.
 
@@ -95,7 +95,13 @@ class Board(object):
 		:return:
 		"""
 
+		# Notes for method overhaul:
+		#   -   Make
+
+		if (debug == True):
+			print("Displaying board {}".format(self.name))
 #		TODO: display method needs SERIOUS overhaul
+		# TODO: This method is not displaying correctly
 
 		# Define the size of the border regions (must be big enough for all
 		# header/sider digits, plus a spacer character)
@@ -118,10 +124,11 @@ class Board(object):
 
 		# Initialize list representation of board (makes it easier to build in
 		# pieces)
+		# Initialize with the unknown character
 		boardLst = [[charUnknown.lower() for x in range(1, self.cols + 1 + border['sider'])] for x in
 		            range(1, self.rows + 1 + border['header'])]
 
-		# Set header
+		# Set header of board
 		for x in range(1, self.cols + 1):
 			# Save x as a right justified string with whitespace to the left.
 			# This gives an easy way to fill in the header region
@@ -151,6 +158,7 @@ class Board(object):
 
 		# Add ships to board
 		# Loop through all ships on board
+		print("Updating all board locations with ships")
 		for i, ship in enumerate(self.ships):
 			# Define display formats:
 			# charShip[0] is for tiles yet to be hit, [1] for tiles hit
@@ -158,25 +166,27 @@ class Board(object):
 			# boardview==0 and ship is not sunk (ship identity shouldn't be
 			# available if ship is only partially hit).  There's probably a
 			# better way to do this, but I didn't bother...
+			# TODO: This section doesn't actually do anything if ship isn't hit.  Update this method.
+
 			charShip = ["", ""]
-			if boardView == 0:
-				if shipView == 0:
+			if boardView == 0: # Ship identity always visible
+				if shipView == 0:  # Ship identified by numeric ID
 					charShip[0] = Fore.YELLOW + str(i) + Style.RESET_ALL
 					charShip[1] = Fore.RED + str(i) + Style.RESET_ALL
-				elif shipView == 1:
+				elif shipView == 1:# Ship identified by character type
 					charShip[0] = Fore.YELLOW + ship.boardID + Style.RESET_ALL
 					charShip[1] = Fore.RED + ship.boardID + Style.RESET_ALL
-			elif boardView == 1:
-				if shipView == 0:
+			elif boardView == 1: # Ship identity hidden unless destroyed
+				if shipView == 0:  # Ship identified by numeric ID
 					charShip[0] = charUnknown
 					charShip[1] = Fore.RED + str(i) + Style.RESET_ALL
-				elif shipView == 1:
+				elif shipView == 1:# Ship identified by character type
 					charShip[0] = charUnknown
 					charShip[1] = Fore.RED + ship.boardID + Style.RESET_ALL
 
 			# For all ship hits, update the board.  If:
 			# 	boardView==0 : show the ship ID char or ID number
-			#	boardView==1 && ship=sunk:  show the ship ID char or ID number
+			#	boardView==1 && ship==sunk:  show the ship ID char or ID number
 			#	else: show  charUnknownHit
 			# Loop through ships coordinates
 			for j, coord in enumerate(ship.coords):
@@ -187,6 +197,9 @@ class Board(object):
 							ship.hits[j]]
 					else:
 						boardLst[coord[0] - 1 + border['header']][coord[1] - 1 + border['sider']] = charUnknownHit
+				# TODO: Need something here to actually print if ship isn't hit
+
+
 
 		# Add water hits to board
 		charWaterHit = Fore.BLUE + "X" + Style.RESET_ALL
@@ -250,6 +263,11 @@ class Board(object):
 		if (not isinstance(ship, Ship)):
 			raise InvalidShip("Invalid input to addShip - must be Ship class")
 
+		if debug == True:
+			print("Adding ship {} to board {}".format(ship.name, self.name))
+			print("Board {} shipMap started as:".format(self.name))
+			print(self.shipMap)
+
 		# Check ship for valid position (fully on map, not on other ships, etc.)
 		# Loop through each position to check validity.  Store local copy of
 		# shipMap, then update this local copy with each coordinate as you
@@ -301,6 +319,10 @@ class Board(object):
 		self.ships.append(ship)
 		# TODO: Can't this just be self.shipMap = tempShipMap ?  Then I don't make an extra copy and delete the existing tempShipMap.
 		self.shipMap = copy.deepcopy(tempShipMap)
+		if debug == True:
+			print("Addship complete.  Board {} shipMap is now:".format(self.name))
+			print(self.shipMap)
+
 
 	def takeFire(self, fireCoord, debug=False):
 		"""
