@@ -12,7 +12,7 @@ class Ship(object):
 
 		# Initialize coordinates and hits
 		self.coords = [(-1,-1) for x in range(1,length+1)]
-		self.hits = [0,] * self.length
+		self.hits = [False,] * self.length
 
 	def __repr__(self):
 		"""
@@ -110,24 +110,30 @@ class Ship(object):
 		if debug==True:
 			print("Ship {} taking fire at coord {}".format(self.name,fireCoord))
 		try:
-			if self.hits[self.coords.index(fireCoord)] == 1:
+			coordStatus = self.coordStatus(fireCoord)
+			if coordStatus['hit'] == True:
 				raise HitDuplicate("Ship {} already hit at coordinate ({},{})".format(self.name, fireCoord[0],fireCoord[1]))
 			else:
-				# Get the index of the coordinate taking a hit.  Log a hit at that index
-				hitIndex = self.coords.index(fireCoord)
-				self.hits[hitIndex] = 1
+				# Assign the hit to the ship
+				self.hits[coordStatus["i"]] = True
 
 				# Print to screen for debugging
 				if debug==True:
 					print("Ship {} hit at coordinate ({},{})".format(self.name, fireCoord[0],fireCoord[1]))
 
 				# Return the index of the hit
-				return(hitIndex)
-		except ValueError:
-			# Return -1 for a miss
-			if debug==True:
-				print("Ship {} missed at coordinate ({},{})".format(self.name, fireCoord[0],fireCoord[1]))
-			return(-1)
+				return(coordStatus["i"])
+		# # TODO: Do I need both of these exceptions?
+		# except ValueError:
+		# 	# Return -1 for a miss
+		# 	if debug==True:
+		# 		print("Ship {} missed at coordinate ({},{})".format(self.name, fireCoord[0],fireCoord[1]))
+		# 	return(-1)
+		except InvalidCoord:
+			# Indicates the coord was either not valid or not on the ship at all
+			if debug == True:
+				print("Ship {} missed at coordinate ({},{})".format(self.name, fireCoord[0], fireCoord[1]))
+			return (-1)
 
 	# Return the health of a ship.  Returned results are:
 	#  [hits remaining, hits taken]
@@ -136,13 +142,51 @@ class Ship(object):
 		Returns a tuple of the health of this ship (hitsRemaining, hitsTaken)
 
 		:return: A tuple of (hitsRemaining, hitsTaken) for this ship
+		:return: A dictionary with hits "taken" and hits "remaining"
 		"""
-		hitsTaken = self.hits.count(1)
-		hitsRemaining = self.hits.count(0)
-		return (hitsRemaining, hitsTaken)
+		hitsTaken = self.hits.count(True)
+		hitsRemaining = self.hits.count(False)
+		return {"taken": hitsTaken, "remaining": hitsRemaining}
+
+	def coordStatus(self,coord,debug=False):
+		"""
+		Accepts a coordinate and returns the status of that coordinate on the ship
+
+		Raises an exception InvalidCoord if the coordinate is not on the ship
+		or invalid.
+
+		:param coord: Tuple of row/col coordinate to interrogate
+		:return: Dictionary of information about that coordinate on the ship:
+			{i: integer index of the position on the ship,
+			 hit: Boolean indicating if this position has been hit}
+		"""
+
+		# This seems like a bad way to do this.  The first exception isn't really
+		# noticed by anyone because it just falls into the except and the
+		# second exception
+		#
+		# If I'm just catching anything that isn't a valid coordinate on this
+		# ship below, and reporting an InvalidCoord error either way, does
+		# this check actually matter?
+		print("Checking ship {}'s status at coordinate ({},{})".format(self.name, coord[0], coord[1]))
+		try:
+			if not isinstance(coord, tuple) or not isinstance(coord[0], int) or not isinstance(coord[1], int):
+				raise InvalidCoord("Coordinate is not tuple of two integers")
+		except:
+			raise InvalidCoord("Coordinate is not tuple of two integers")
+
+		# Find the coord in the ship
+		try:
+			i = self.coords.index(coord)
+		except ValueError:
+			raise InvalidCoord("Coordinate ({},{}) is not on ship {}".format(coord[0],coord[1],self.name))
+
+		hit = self.hits[i]
+
+		return {"i": i, "hit": hit}
 
 
-###########################
+	###########################
 # Ship Subclasses
 ###########################
 class Battleship(Ship):
@@ -199,6 +243,16 @@ class InvalidBoardIDLength(Exception):
 	def __str__(self):
 		return repr(self.value)
 
+class InvalidCoord(Exception):
+	"""
+	Class for raising error when interrogating a ship about a coordinate that is
+	invalid (not on ship, non-numeric/integer, etc.)
+	"""
+	def __init__(self, value):
+		self.value = value
+	def __str__(self):
+		return repr(self.value)
+
 
 ###########################
 # Test code for the methods
@@ -222,7 +276,7 @@ if __name__ == '__main__':
 	# Initialize some ships
 	ships.append(Battleship("Mr. Battleship"))
 	ships.append(Submarine("Mrs. Submarine"))
-	ships.append(HugeShip("Dr. HugeShip"))
+	# ships.append(HugeShip("Dr. HugeShip"))
 
 	printShips(ships)
 
@@ -234,11 +288,39 @@ if __name__ == '__main__':
 
 	# Place the submarine using getStraightCoord
 	dir = "R"
-	coords = ships[1].getStraightCoords((1,0),dir)
+	# reverse the order of these just to be fancy
+	coords = ships[1].getStraightCoords((0,3),dir)[::-1]
+	print(coords)
 	ships[1].placeShip(coords)
 
 	printShips(ships)
 
+	# Test coordStatus by probing ships
+	coords = [(0,0), (0,3), (0,6), "not valid", (5,'not valid')]
+	for coord in coords:
+		try:
+			print(ships[0].coordStatus(coord))
+		except Exception as e:
+			print("caught exception: {}".format(e))
+
+	print('Shooting the ships')
+	# Fire on the ship
+	coords = [(0,0), (0,3), (0,6), "not valid", (5,'not valid')]
+	for ship in ships:
+		for coord in coords:
+			try:
+				x = ship.takeFire(coord)
+				print("ship.takeFire returned {}".format(x))
+				print(ship.coordStatus(coord))
+			except Exception as e:
+				print("caught exception: {}".format(e))
+
+	for ship in ships:
+		print(ship.getHealth())
+
+
+#
+	#
 
 	# # Add ships to board
 	# print("Add ships to board:")
