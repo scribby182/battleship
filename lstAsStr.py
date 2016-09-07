@@ -1,4 +1,4 @@
-def lstAsStr(lst, colSep = "", rowSep = "\n"):
+def lstAsStr(lst, colSep = "", rowSep = "\n", debug = False):
 	"""
 	Returns a string representation of a 2D list.
 
@@ -26,12 +26,14 @@ def lstAsStr(lst, colSep = "", rowSep = "\n"):
 
 	output = ""
 	for row in lst:
-		print("processing row {}".format(row))
+		if debug == True:
+			print("processing row {}".format(row))
 		try:
 			output = output + colSep.join([str(x) for x in row]) + rowSep
 		except:
 			output = output + str(row) + rowSep
-		print("Output string is now: \n{}\n".format(output))
+		if debug == True:
+			print("Output string is now: \n{}\n".format(output))
 	return output
 
 
