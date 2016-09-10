@@ -1,4 +1,4 @@
-def lstAsStr(lst, colSep = "", rowSep = "\n", debug = False):
+def lst2str(lst, colSep ="", rowSep ="\n", debug = False):
 	"""
 	Returns a string representation of a 2D list.
 
@@ -46,4 +46,4 @@ if __name__ == '__main__':
 
 	for i,lst in enumerate(lists):
 		print("Printing test list {}".format(i))
-		print(lstAsStr(lst))
+		print(lst2str(lst))
