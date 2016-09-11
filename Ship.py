@@ -53,25 +53,39 @@ class Ship(object):
 		return "{shipClass:<12} ({ID}): {name}\nLength          : {length}\nLocation        : {location}\n{hitHeader:<16}: {hits}".format(shipClass=self.shipClass, ID=self.boardID, name=self.name, length=self.length, location=coordsStr, hitHeader="Hits:", hits=hitsStr)
 
 
-	def placeShip(self,coords):
+	def setCoords(self, coords = None, debug = True):
 		"""
 		Method for setting the coordinates of a ship.
 		:param coords: list of tuples or Coord objects.  Tuples will be converted internally to Coord objects.
 		:return: Return 1 if completed (not sure why I did this...)
 		"""
+
+		if debug == True:
+			printArgs(exclude = ['self'])
+
+		if coords == None:
+			# Get coords interactively from user
+			coords = [None for x in range(0,self.length)]
+			for i in range(len(coords)):
+				print("Set the coordinate of ship {}'s pip {}".format(self.name, i))
+				coords[i] = Coord()
+
+			if debug == True:
+				print("setCoords coords interactively defined as:")
+				print(coords)
+
 		if len(coords) == self.length:
 			self.coords = [coord if isinstance(coord,Coord) else Coord(coord) for coord in coords]
 		else:
 			raise IncorrectShipLength("Ship \"{}\" expects coords of length {}, received length {}".format(self.name, self.length, len(coords)))
 		return 1
 
-
-	def getStraightCoords(self, origin, direction, debug = False):
+	def getStraightCoords(self, origin = None, direction = None, debug = False):
 		"""
-		Method to generate the coordinates of a ship based on an origin coordinate and direction (U/D/L/R).
+		Method to generate the coordinates of a ship based on an origin coordinate and direction (U/D/L/R).  Prompts user for origin/direction if left as None.
 
-		:param origin: Tuple coordinate for one end of the ship
-		:param direction: String (U/D/L/R indicating Up/Down/Left/Right) for the direction to place the ship relative to the origin
+		:param origin: (Optional) Tuple coordinate for one end of the ship
+		:param direction: (Optional) String (U/D/L/R indicating Up/Down/Left/Right) for the direction to place the ship relative to the origin
 
 		:return:  List of tuples for the coordinates of the ship
 		"""
@@ -79,15 +93,37 @@ class Ship(object):
 		if debug == True:
 			printArgs(exclude=['self'])
 
-		# Initialize the output list
+		# Initialize the output list of coordinates
 		coords = [None] * self.length
 
-		# Set the first coordinate
-		# Convert origin to Coord object if necessary
-		if not isinstance(origin, Coord):
-			coords[0] = Coord(origin)
+		# Get origin, convert tuple origin to Coord, or make a deepcopy of origin as coords[0]
+		if origin == None:
+			print("Set the origin of the ship:")
+			coords[0] = Coord()
+		elif not isinstance(origin,Coord):
+			coords[0]= Coord(origin)
 		else:
-			coords[0]=copy.deepcopy(origin)
+			coords[0] = copy.deepcopy(origin)
+
+		# Function for determining if a direction string is valid
+		def validDirection(direction):
+			if direction in ['U','D','L','R']:
+				return True
+			else:
+				return False
+
+		# Get direction from user or use already defined direction
+		if direction == None:
+			while True:
+				direction = input("Set direction the ship is pointing from origin (U/D/L/R): ").upper()
+				if validDirection(direction):
+					break
+				else:
+					print("Direction {} is invalid.  Value must be U, D, L, or R".format(direction))
+					continue
+		else:
+			if not validDirection(direction):
+				raise ValueError("Input \'direction={}\' not valid".format(direction))
 
 		# Assign a position delta based on the direction variable
 		deltaCoord = ()
@@ -299,14 +335,14 @@ if __name__ == '__main__':
 	print("Placing the ships.")
 	# Place the battleship arbitrarily
 	coords = [(0,i) for i in range(0,5)]
-	ships[0].placeShip(coords)
+	ships[0].setCoords(coords)
 
 	# Place the submarine using getStraightCoord
 	dir = "R"
 	# reverse the order of these just to be fancy
 	coords = ships[1].getStraightCoords((0,3),dir)[::-1]
 	print(coords)
-	ships[1].placeShip(coords)
+	ships[1].setCoords(coords)
 
 	printShips(ships)
 
@@ -334,6 +370,24 @@ if __name__ == '__main__':
 		print(ship.getHealth())
 
 	printShips(ships)
+
+
+	# print("Test getStraightCoords()")
+	# for ship in ships:
+	# 	print("Set straightCoords using ship {} for method".format(ship.name))
+	# 	print(ship.getStraightCoords())
+	# 	input("Pause here")
+	#
+	# printShips(ships)
+
+	print("Test interactively placing ship")
+	for ship in ships:
+		print("Place ship {}".format(ship.name))
+		ship.setCoords()
+
+	print("done Ship.py debug __main__")
+
+
 #
 	#
 

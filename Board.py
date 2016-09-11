@@ -588,9 +588,9 @@ if __name__ == '__main__':
 	print("Make some ships:")
 	ships = []
 	ships.append(Battleship("Battleship1"))
-	ships[-1].placeShip([(2,i) for i in range(1,ships[-1].length+1)])
+	ships[-1].setCoords([(2, i) for i in range(1, ships[-1].length + 1)])
 	ships.append(Submarine("Sub1"))
-	ships[-1].placeShip([(3,i) for i in range(1,ships[-1].length+1)])
+	ships[-1].setCoords([(3, i) for i in range(1, ships[-1].length + 1)])
 
 	for i,ship in enumerate(ships):
 		print("Ship {}:".format(i))
