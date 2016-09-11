@@ -148,7 +148,7 @@ class Ship(object):
 		hitsRemaining = self.hits.count(False)
 		return {"taken": hitsTaken, "remaining": hitsRemaining}
 
-	def coordStatus(self,coord,debug=False):
+	def coordStatus(self, coord, debug=False):
 		"""
 		Accepts a coordinate and returns the status of that coordinate on the ship
 
@@ -168,7 +168,8 @@ class Ship(object):
 		# If I'm just catching anything that isn't a valid coordinate on this
 		# ship below, and reporting an InvalidCoord error either way, does
 		# this check actually matter?
-		print("Checking ship {}'s status at coordinate ({},{})".format(self.name, coord[0], coord[1]))
+		if debug == True:
+			print("Checking ship {}'s status at coordinate ({},{})".format(self.name, coord[0], coord[1]))
 		try:
 			if not isinstance(coord, tuple) or not isinstance(coord[0], int) or not isinstance(coord[1], int):
 				raise InvalidCoord("Coordinate is not tuple of two integers")
