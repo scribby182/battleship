@@ -65,8 +65,7 @@ class Ship(object):
 			raise IncorrectShipLength("Ship \"{}\" expects coords of length {}, received length {}".format(self.name, self.length, len(coords)))
 		return 1
 
-	# Takes the origin and direction of a straight ship (either constant row
-	# or constant column) and computes the ship's coordinates
+
 	def getStraightCoords(self, origin, direction, debug = False):
 		"""
 		Method to generate the coordinates of a ship based on an origin coordinate and direction (U/D/L/R).
