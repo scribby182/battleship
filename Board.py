@@ -322,7 +322,7 @@ class Board(object):
 			print(self.shipMap)
 
 
-	def takeFire(self, debug = False):
+	def interactiveFire(self, debug = False):
 		"""
 		Provides a text prompt to the user for firing.  Continues to loop until valid shot registered.
 
@@ -617,7 +617,7 @@ if __name__ == '__main__':
 
 	print("Fire at some ships and see if it shows up correctly in display")
 	while True:
-		myBoard.takeFire()
+		myBoard.interactiveFire()
 		# print(myBoard)
 		print()
 
