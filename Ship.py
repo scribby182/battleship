@@ -1,3 +1,8 @@
+from Coord import Coord
+import copy
+from printArgs import printArgs
+
+
 ################################################################################
 # Ship class
 ################################################################################
@@ -11,10 +16,10 @@ class Ship(object):
 		self.length = length
 
 		# Initialize coordinates and hits
-		self.coords = [(-1,-1) for x in range(1,length+1)]
+		self.coords = [None for x in range(1,length+1)]
 		self.hits = [False,] * self.length
 
-	def __repr__(self):
+	def __repr__(self, debug = False):
 		"""
 		# Format the printing of Ships
 		# This defines what is returned when I do "print(myShip)", that way I don't need to keep writing something
@@ -22,7 +27,7 @@ class Ship(object):
 		"""
 
 		# Format coordinate output
-		coordsStr = "[" + ", ".join("(%s,%s)" % coord for coord in self.coords) + "]"
+		coordsStr = "[" + ", ".join(["{}".format(coord) for coord in self.coords]) + "]"
 
 		# Format self.hits output with same spacing as CoordsStr.  To do this, strip
 		# the [], then separate by ", " and take the size of each remaining part
@@ -30,15 +35,19 @@ class Ship(object):
 		# I could have also built this up in a for loop while building coordsStr,
 		# but this works and lets me try something more complex...  This really
 		# isn't as robust though, especially since I rely on the separator ", "
-		tempHitsFormat = coordsStr.strip("[]").split(", ")
-		hitsStr = "[ "
+		tempHitsFormat = coordsStr.lstrip('[(').rstrip(')]').split("), (")
+		hitsStr = "["
 		for i in range(0,len(tempHitsFormat)):
+
+			# Elements have "), (" between them stripped as well as
+			# leading/trailing parentheses.  Need to pad width value
+			# Last element needs padding of 2.  Others need 4
 			if i == len(tempHitsFormat)-1:
-				widthshift = -1
-			else:
 				widthshift = 2
+			else:
+				widthshift = 4
 			width = len(tempHitsFormat[i]) + widthshift
-			hitsStr = hitsStr + "{0:<{1}}".format(self.hits[i],width)
+			hitsStr = hitsStr + "{0:<{1}}".format(str(self.hits[i]),width)
 		hitsStr = hitsStr + "]"
 
 		return "{shipClass:<12} ({ID}): {name}\nLength          : {length}\nLocation        : {location}\n{hitHeader:<16}: {hits}".format(shipClass=self.shipClass, ID=self.boardID, name=self.name, length=self.length, location=coordsStr, hitHeader="Hits:", hits=hitsStr)
@@ -47,18 +56,18 @@ class Ship(object):
 	def placeShip(self,coords):
 		"""
 		Method for setting the coordinates of a ship.
-		:param coords: list of tuples, one for each segment of a ship.
+		:param coords: list of tuples or Coord objects.  Tuples will be converted internally to Coord objects.
 		:return: Return 1 if completed (not sure why I did this...)
 		"""
 		if len(coords) == self.length:
-			self.coords = coords
+			self.coords = [coord if isinstance(coord,Coord) else Coord(coord) for coord in coords]
 		else:
 			raise IncorrectShipLength("Ship \"{}\" expects coords of length {}, received length {}".format(self.name, self.length, len(coords)))
 		return 1
 
 	# Takes the origin and direction of a straight ship (either constant row
 	# or constant column) and computes the ship's coordinates
-	def getStraightCoords(self,origin,direction):
+	def getStraightCoords(self, origin, direction, debug = False):
 		"""
 		Method to generate the coordinates of a ship based on an origin coordinate and direction (U/D/L/R).
 
@@ -68,11 +77,18 @@ class Ship(object):
 		:return:  List of tuples for the coordinates of the ship
 		"""
 
+		if debug == True:
+			printArgs(exclude=['self'])
+
 		# Initialize the output list
 		coords = [None] * self.length
 
 		# Set the first coordinate
-		coords[0]=origin
+		# Convert origin to Coord object if necessary
+		if not isinstance(origin, Coord):
+			coords[0] = Coord(origin)
+		else:
+			coords[0]=copy.deepcopy(origin)
 
 		# Assign a position delta based on the direction variable
 		deltaCoord = ()
@@ -87,15 +103,12 @@ class Ship(object):
 
 		# Assign the rest of the coordinates
 		for i in range(1,self.length):
-			coords[i] = (coords[i-1][0] + deltaCoord[0], coords[i-1][1] + deltaCoord[1])
+			# Make a new coord object rather than update
+			coords[i] = Coord((coords[i-1].x + deltaCoord[0], coords[i-1].y + deltaCoord[1]))
 
 		return coords
 
-	# Method determines if ship is hit by fire, logs any hits, and returns results
-	# Return values are:
-	#	N (>1): the index of the coordinate hit
-	#	-1: miss
-	#	-2: hit, but the ship was already hit there anyway
+
 
 	def takeFire(self, fireCoord, debug=False):
 		"""
@@ -107,19 +120,25 @@ class Ship(object):
 		:param fireCoord: Tuple coordinate of fire to test for a hit
 		:return: -1 (miss) or integer segment of the ship that was hit (ie: fireCoord == ship.coord[2], return 2)
 		"""
+		# Convert fireCoord to a Coord object if necessary
+		if not isinstance(fireCoord,Coord):
+			fireCoord = Coord(fireCoord)
+		else:
+			fireCoord = copy.deepcopy(fireCoord)
+
 		if debug==True:
 			print("Ship {} taking fire at coord {}".format(self.name,fireCoord))
 		try:
 			coordStatus = self.coordStatus(fireCoord)
 			if coordStatus['hit'] == True:
-				raise HitDuplicate("Ship {} already hit at coordinate ({},{})".format(self.name, fireCoord[0],fireCoord[1]))
+				raise HitDuplicate("Ship {} already hit at coordinate {}".format(self.name, fireCoord))
 			else:
 				# Assign the hit to the ship
 				self.hits[coordStatus["i"]] = True
 
 				# Print to screen for debugging
 				if debug==True:
-					print("Ship {} hit at coordinate ({},{})".format(self.name, fireCoord[0],fireCoord[1]))
+					print("Ship {} hit at coordinate {}".format(self.name, fireCoord))
 
 				# Return the index of the hit
 				return(coordStatus["i"])
@@ -127,12 +146,12 @@ class Ship(object):
 		# except ValueError:
 		# 	# Return -1 for a miss
 		# 	if debug==True:
-		# 		print("Ship {} missed at coordinate ({},{})".format(self.name, fireCoord[0],fireCoord[1]))
+		# 		print("Ship {} missed at coordinate {}".format(self.name, fireCoord))
 		# 	return(-1)
 		except InvalidCoord:
 			# Indicates the coord was either not valid or not on the ship at all
 			if debug == True:
-				print("Ship {} missed at coordinate ({},{})".format(self.name, fireCoord[0], fireCoord[1]))
+				print("Ship {} missed at coordinate {}".format(self.name, fireCoord))
 			return (-1)
 
 	# Return the health of a ship.  Returned results are:
@@ -161,26 +180,23 @@ class Ship(object):
 			 hit: Boolean indicating if this position has been hit}
 		"""
 
-		# This seems like a bad way to do this.  The first exception isn't really
-		# noticed by anyone because it just falls into the except and the
-		# second exception
-		#
-		# If I'm just catching anything that isn't a valid coordinate on this
-		# ship below, and reporting an InvalidCoord error either way, does
-		# this check actually matter?
+		# Convert coord to Coord object if necessary
+		if not isinstance(coord, Coord):
+			coord = Coord(coord)
+		else:
+			coord = copy.deepcopy(coord)
+
 		if debug == True:
-			print("Checking ship {}'s status at coordinate ({},{})".format(self.name, coord[0], coord[1]))
-		try:
-			if not isinstance(coord, tuple) or not isinstance(coord[0], int) or not isinstance(coord[1], int):
-				raise InvalidCoord("Coordinate is not tuple of two integers")
-		except:
-			raise InvalidCoord("Coordinate is not tuple of two integers")
+			print("Checking ship {}'s status at coordinate {}".format(self.name, coord))
+			printArgs()
+			print(type(coord))
 
 		# Find the coord in the ship
 		try:
+			# Does this work with Coord object?
 			i = self.coords.index(coord)
 		except ValueError:
-			raise InvalidCoord("Coordinate ({},{}) is not on ship {}".format(coord[0],coord[1],self.name))
+			raise InvalidCoord("Coordinate {} is not on ship {}".format(coord,self.name))
 
 		hit = self.hits[i]
 
@@ -208,7 +224,6 @@ class Submarine(Ship):
 		shipClass = "Submarine"
 		boardID = "S"
 		length = 3
-#		coords = self.straightShipCoords(origin,direction)
 		super().__init__(name, shipClass, boardID, length)
 
 class HugeShip(Ship):
@@ -319,7 +334,7 @@ if __name__ == '__main__':
 	for ship in ships:
 		print(ship.getHealth())
 
-
+	printShips(ships)
 #
 	#
 
