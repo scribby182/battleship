@@ -1,10 +1,10 @@
 import sys
 import copy
-from Ship import Ship
-from Ship import Battleship
-from Ship import Submarine
+from Ship import Ship, Battleship, Submarine, HitDuplicate
 from lst2str import lst2str
 from printArgs import printArgs
+from Coord import Coord
+
 
 # To color text on the board
 from colorama import init, Fore, Style
@@ -140,7 +140,7 @@ class Board(object):
 
 			for i,coord in enumerate(ship.coords):
 				if debug == True:
-					print("\tProcessing coordinate {} ({},{})".format(i,coord[0],coord[1]))
+					print("\tProcessing coordinate {} {}".format(i,coord))
 
 				# Set character to use for ship based on sDisp
 				if sDisp == "ID":
@@ -170,13 +170,13 @@ class Board(object):
 					raise Exception("Unknown value for visible.  Must be \"all\" or \"revealed\"")
 
 				if debug == True:
-					print("\tSea at ({},{}) updated to {}".format(coord[0],coord[1],charShip))
-				ocean[coord[0]][coord[1]] = charShip
+					print("\tSea at {} updated to {}".format(coord,charShip))
+				ocean[coord.x][coord.y] = charShip
 
 		# Loop through all water hits and add to board
 		charWaterHit = Fore.BLUE + Style.BRIGHT + water + Style.RESET_ALL
 		for coord in self.waterhits:
-			ocean[coord[0]][coord[1]] = charWaterHit
+			ocean[coord.x][coord.y] = charWaterHit
 
 		if debug == True:
 			print("ocean as string:")
@@ -287,16 +287,18 @@ class Board(object):
 		# easier...
 		for coord in ship.coords:
 			if debug == True:
-				print("Trying to place ship {} at coord ({},{})".format(ship.name, coord[0], coord[1]))
+				print("Trying to place ship {} at coord {}".format(ship.name, coord))
 			# Check if row is inside board
-			if (coord[0] - 1 < 0 or coord[0] - 1 > self.rows):
-				raise InvalidShip("New ship {0} must be within board ( 1 <= row <= {1}".format(ship.name, self.rows))
+			if (coord.x < 0 or coord.x >= self.rows):
+				raise InvalidShip("New ship {0} must be within board ( 0 <= row <= {1}".format(ship.name, self.rows - 1))
 			# Check if col is inside board
-			elif (coord[1] - 1 < 0 or coord[1] - 1 > self.cols):
-				raise InvalidShip("New ship {0} must be within board ( 1 <= col <= {1}".format(ship.name, self.cols))
+			elif (coord.y < 0 or coord.y >= self.cols):
+				raise InvalidShip("New ship {0} must be within board ( 0 <= col <= {1}".format(ship.name, self.cols - 1))
 			# Check if coordinate is already taken
-			elif tempShipMap[coord[0] - 1][coord[1] - 1] >= 0:
-				overlapShipNum = tempShipMap[coord[0] - 1][coord[1] - 1]
+			# TODO: Is there another way for this? Not sure if this actually works. And shipMap hasn't been used much elsewhere
+			# TODO: Check if placing overlaping ships raises error like it should
+			elif tempShipMap[coord.x][coord.y] >= 0:
+				overlapShipNum = tempShipMap[coord.x][coord.y]
 				overlapShipName = self.ships[overlapShipNum].name
 				raise InvalidShip("New ship {0} overlaps previous ship {1} (ID: {2})".format(ship.name, overlapShipName,
 				                                                                           overlapShipNum))
@@ -304,13 +306,11 @@ class Board(object):
 			else:
 				if debug == True:
 					print("\tPassed all checks - ship fits!")
-					print("\tupdating coord ({},{})".format(coord[0] - 1,
-					                                        coord[1] - 1))
-					print("\tshipMap was {}".format(tempShipMap[coord[0] - 1][coord[1] - 1]))
-				tempShipMap[coord[0] - 1][coord[1] - 1] = nextShipIndex
+					print("\tupdating coord {}".format(coord))
+					print("\tshipMap was {}".format(tempShipMap[coord.x][coord.y]))
+				tempShipMap[coord.x][coord.y] = nextShipIndex
 				if debug == True:
-					print("\tshipMap now {}".format(
-									tempShipMap[coord[0] - 1][coord[1] - 1]))
+					print("\tshipMap now {}".format(tempShipMap[coord.x][coord.y]))
 
 		# If we get here, all coordinates worked.  Add ship to .ships and
 		# move the local copy of shipMap (tempShipMap) back to the big time
@@ -335,6 +335,7 @@ class Board(object):
 		print("Where would you like to fire?")
 
 		# Continue taking targets until a valid one is entered
+		# TODO: Update this with Coord object's method
 		while True:
 			# Reinitialize coord (so last iterations coord doesn't get used)
 			coord = []
@@ -347,12 +348,12 @@ class Board(object):
 			try:
 				hitIndex = self.processFire(coord)
 			except FireOutsideBoard as e:
-				print("Invalid shot - ({},{}) is not on the board".format(coord[0],coord[1]))
+				print("Invalid shot - {} is not on the board".format(coord))
 				if debug == True:
 					print(str(e))
 				continue
-			except FireRedundant as e:
-				print("Invalid shot - ({},{}) has already been hit".format(coord[0],coord[1]))
+			except HitDuplicate as e:
+				print("Invalid shot - {} has already been hit".format(coord))
 				if debug == True:
 					print(str(e))
 				continue
@@ -374,7 +375,7 @@ class Board(object):
 
 	def processFire(self, fireCoord, debug=False):
 		"""
-		Accepts a tuple coordinate that is being shot at, determines if there is a ship at that coordinate, and updates the ship/water hits accordingly.
+		Accepts a Coord object or tuple of the coordinate that is being shot at, determines if there is a ship at that coordinate, and updates the ship/water hits accordingly.
 
 		Return values are:
 		-	N (>0): index of the ship hit
@@ -382,9 +383,9 @@ class Board(object):
 
 		Exceptions are raised if
 		-   FireOutsideBoard - fireCoord is not within the board
-		-   FireRedundant - fireCoord is a redundant shot (board already hit there)
+		-   HitDuplicate - fireCoord is a redundant shot (board already hit there)
 
-		:param fireCoord: Tuple coordinate to attempt to hit
+		:param fireCoord: Coord object or tuple of (x,y) coordinate to attempt to hit
 		:return:  See above
 		"""
 
@@ -400,10 +401,15 @@ class Board(object):
 		if debug == True:
 			print("Board {} taking fire at coord {}".format(self.name, fireCoord))
 
+		# Convert fireCoord to Coord object if necessary, or make a copy of the input fireCoord.
+		if not isinstance(fireCoord, Coord):
+			fireCoord = Coord(fireCoord)
+		else:
+			fireCoord = copy.deepcopy(fireCoord)
+
 		# Check if fireCoord is within board
-		if (fireCoord[0] >= self.rows or fireCoord[0] < 0 or fireCoord[1] >= self.cols or fireCoord[1] < 0):
-			message = "({},{}) is outside board ({} rows, {} cols)".format(fireCoord[0], fireCoord[1], self.rows,
-			                                                               self.cols)
+		if (fireCoord.x >= self.rows or fireCoord.x < 0 or fireCoord.y >= self.cols or fireCoord.y < 0):
+			message = "{} is outside board ({} rows, {} cols)".format(fireCoord, self.rows, self.cols)
 			raise FireOutsideBoard(message)
 		hitany = -1
 
@@ -415,8 +421,8 @@ class Board(object):
 				# is redundant
 				hitthis = ship.takeFire(fireCoord)
 			# If ship has already been hit here, raise exception
-			except FireRedundant:
-				raise FireRedundant("Board hit with redundant shot on ship {} ({})".format(ship.name, i))
+			except HitDuplicate:
+				raise HitDuplicate("Board hit with redundant shot on ship {} ({})".format(ship.name, i))
 
 			# Record the ship that was hit
 			if hitthis >= 0:
@@ -427,7 +433,7 @@ class Board(object):
 		# accordingly
 		if hitany == -1:
 			if fireCoord in self.waterhits:
-				raise FireRedundant("Board hit with redundant shot in water")
+				raise HitDuplicate("Board hit with redundant shot in water")
 			else:
 				self.waterhits.append(fireCoord)
 
@@ -557,13 +563,6 @@ class FireOutsideBoard(Exception):
 	def __str__(self):
 		return repr(self.value)
 
-# Exception for when a board/ship takes a redundant hit
-class FireRedundant(Exception):
-	def __init__(self, value):
-		self.value = value
-
-	def __str__(self):
-		return repr(self.value)
 
 ###########################
 # Test code for the methods
