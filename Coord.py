@@ -35,6 +35,31 @@ class Coord(object):
 		except Exception as e:
 			raise e
 
-
 	def __repr__(self):
+		"""
+		Defines how print(Coord_instance) shows
+		:return: String representation of Coord instance
+		"""
 		return "({}, {})".format(self.x,self.y)
+
+	def __eq__(self, other):
+		"""
+		Defines the conditions for equality between a Coord instance and another object
+		:param other: Some object
+		:return: True if equal
+		"""
+		try:
+			result = (self.__dict__ == other.__dict__) and (
+			type(self) == type(other))
+		except:
+			result = False
+		return result
+
+	def __ne__(self, other):
+		"""
+		Defines the conditions for inequality between a Coord instance and another object
+		:param other: Some object
+		:return: True if not equal
+		"""
+		return not self == other
+
