@@ -315,7 +315,6 @@ class Board(object):
 		# If we get here, all coordinates worked.  Add ship to .ships and
 		# move the local copy of shipMap (tempShipMap) back to the big time
 		self.ships.append(ship)
-		# TODO: Can't this just be self.shipMap = tempShipMap ?  Then I don't make an extra copy and delete the existing tempShipMap.
 		self.shipMap = copy.deepcopy(tempShipMap)
 		if debug == True:
 			print("Addship complete.  Board {} shipMap is now:".format(self.name))
@@ -337,13 +336,8 @@ class Board(object):
 		# Continue taking targets until a valid one is entered
 		# TODO: Update this with Coord object's method
 		while True:
-			# Reinitialize coord (so last iterations coord doesn't get used)
-			coord = []
-			try:
-				coord = (int(input("Row: ")), int(input("Col: ")))
-			except ValueError:
-				print("Invalid target - row/col must be integers")
-				continue
+			# Get coord from user through screen prompt
+			coord = Coord()
 
 			try:
 				hitIndex = self.processFire(coord)
