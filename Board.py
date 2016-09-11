@@ -2,7 +2,9 @@ import sys
 import copy
 from Ship import Ship
 from Ship import Battleship
-
+from Ship import Submarine
+from lst2str import lst2str
+from printArgs import printArgs
 
 # To color text on the board
 from colorama import init, Fore, Style
@@ -75,145 +77,141 @@ class Board(object):
 
 
 
-	def display(self, boardView, shipView, debug = False):
+	def display(self, visible="revealed", sDisp="ID" , debug = False):
 		"""
 		Method to generate a string showing the status of the board.
 
-		Board squares and ship identities can be obscured depending on mode selected.
-		For all modes, color coding is as follows:
-			Water = Bright blue (not hit) or dim blue (hit)
-			Ships = Yellow (not hit) or red (hit)
+		Two visibility modes are available:
+			all -   Shows all ship locations
+					Ships are yellow (not hit) or red (hit)
+					Water is dim blue (not hit) or bright blue (hit)
+			revealed -  Shows only locations revealed by fire
+						Revealed (hit) ships are red
+						Revealed (hit) water is bright blue
+						Areas not yet revealed are charUnknown
 
-		NOTE: I think this can be refactored to simplify greatly, but haven't tried yet.
+		Two modes are available for displaying fully revealed ship identities:
+			ID  -   Ship is identified with its numeric ID
+			type-   Ship is identified with its type
+		Ship identities are only shown when the ship is fully revealed (ie: if
+		visible="all" or visible="revealed" and the ship is destroyed.)
 
-		:param boardView: Toggle for board viewing modes:
-							0 - show the entire board, including all ships (god mode)
-							1 - show the board revealed so far (only where shots fired)
-		:param shipView: Toggle for the ship viewing modes:
-							0- show ships as their index
-							1- show ships as their ID character
-		:return:
+
+		:param visible: Toggle for board visibility modes:
+			all -   Shows all ship locations.
+			revealed -  Shows only locations revealed by fire.
+		:param sDisp: Toggle for the ship display mode:
+			ID  -   Ship is identified with its numeric ID
+			type-   Ship is identified with its type
+		:return: String shownig the board
 		"""
 
-		# Notes for method overhaul:
-		#   -   Make
+		# Method:
+		# Build 2D list of characters for the playing field of the board
+		#   For each element of each ship, assign a character to the
+		#   corresponding element of the board list.  Choose which type of
+		#   character to use based on visible/sDisp
+		# Build the header and sider character 2D lists
+		# Assemble the lists into a single board
+		# Return board as a string
 
-		if (debug == True):
-			print("Displaying board {}".format(self.name))
-#		TODO: display method needs SERIOUS overhaul
-		# TODO: This method is not displaying correctly
+		if debug == True:
+			# Print all function arguments to screen for easy debugging
+			# Exclude 'self' to avoid infinite loop (printing self calls
+			# __repr__, which calls display, which ...
+			printArgs(exclude=['self'])
 
-		# Define the size of the border regions (must be big enough for all
-		# header/sider digits, plus a spacer character)
-		# 	floor(number of row/col / 10) + 1 for first digit + 1 for spacer
-		border = {'header': self.cols // 10 + 2, 'sider': self.rows // 10 + 2}
+		# Define a character for water that has not been hit
+		# if visible=="all":
+		# 	charWater = Style.BRIGHT +"o"
+		# else:
+		# 	charWater = Style.DIM + "o"
+		water = "O"
+		charWater = Fore.BLUE + Style.DIM + water + Style.RESET_ALL
 
-		# character used for any unexplored region of the board
-		charUnknown = "?"
+		# Initialize ocean, a list for the part of the board where sea/ships
+		# are located
+		ocean = [[charWater for x in range(self.cols)] for y in range(self.rows)]
 
-		# Character for square with hit on unknown ship
-		charUnknownHit = Fore.RED + "?" + Style.RESET_ALL
+		# Loop through ships and display them in ocean if appropriate
+		for j,ship in enumerate(self.ships):
+			if debug == True:
+				print("Placing ship \"{}\" in ocean".format(ship.name))
+
+			for i,coord in enumerate(ship.coords):
+				if debug == True:
+					print("\tProcessing coordinate {} ({},{})".format(i,coord[0],coord[1]))
+
+				# Set character to use for ship based on sDisp
+				if sDisp == "ID":
+					charShip = str(j)
+				elif sDisp == "type":
+					charShip = str(ship.boardID)
+				else:
+					raise Exception("Unknown value for sDisp.  Must be \"ID\" or \"type\"")
+
+				# Assign new character to ocean depending on visibility mode
+				# and whether the location has been hit
+				if visible == "all":
+					if ship.hits[i] == True:
+						charShip = Fore.RED + charShip + Style.RESET_ALL
+					else:
+						charShip = Fore.YELLOW + charShip + Style.RESET_ALL
+				elif visible == "revealed":
+					if ship.hits[i] == True:
+						if ship.getHealth()["remaining"] == 0:
+							charShip = Fore.RED + charShip + Style.RESET_ALL
+						else:
+							charShip = Fore.RED + "?" + Style.RESET_ALL
+					else:
+						# If not hit and visible="revealed", then do not assign anything
+						continue
+				else:
+					raise Exception("Unknown value for visible.  Must be \"all\" or \"revealed\"")
+
+				if debug == True:
+					print("\tSea at ({},{}) updated to {}".format(coord[0],coord[1],charShip))
+				ocean[coord[0]][coord[1]] = charShip
+
+		# Loop through all water hits and add to board
+		charWaterHit = Fore.BLUE + Style.BRIGHT + water + Style.RESET_ALL
+		for coord in self.waterhits:
+			ocean[coord[0]][coord[1]] = charWaterHit
+
+		if debug == True:
+			print("ocean as string:")
+			print(lst2str(ocean))
+
+		# Define the border areas (header and sider)
 
 		# Define border text style as function (easier to update later)
+		# Should I have used this above for the ship characters?
 		def borderText(text):
 			return Fore.CYAN + str(text) + Style.RESET_ALL
 
-		# Define spacer characters
-		headerSpacer = "-"
-		siderSpacer = "|"
+		# Generate header and sider
+		headerLst = makeHeader(range(self.cols), spacer='-')
+		if debug == True:
+			print("header as string:")
+			print(borderText(lst2str(headerLst)))
 
-		# Initialize list representation of board (makes it easier to build in
-		# pieces)
-		# Initialize with the unknown character
-		boardLst = [[charUnknown.lower() for x in range(1, self.cols + 1 + border['sider'])] for x in
-		            range(1, self.rows + 1 + border['header'])]
+		sider = makeHeader(range(self.rows), spacer='|')
+		sider = lstTranspose(sider)
+		if debug == True:
+			print("sider as string:")
+			print(borderText(lst2str(sider)))
 
-		# Set header of board
-		for x in range(1, self.cols + 1):
-			# Save x as a right justified string with whitespace to the left.
-			# This gives an easy way to fill in the header region
-			# Probably could have done this straight in the for loop call...
-			xAsStr = "{x: >{width}}".format(x=x, width=border['header'] - 1)
+		# Assemble sider and ocean together
+		boardLst = [sider[i] + ocean[i] for i in range(len(sider))]
 
-			# For each row of the header, fill in the appropriate character from
-			# x.  First row gets left most character, next row gets second left
-			# most, etc...
-			for y in range(1, border['header']):
-				#				boardLst[y-1][border['sider']+x-1] = borderStyle + xAsStr[y-1] + Style.RESET_ALL
-				boardLst[y - 1][border['sider'] + x - 1] = borderText(xAsStr[y - 1])
-			# Set the header spacer line
-			boardLst[border['header'] - 1][border['sider'] + x - 1] = borderText(headerSpacer)
+		# Top with header, but shift header over by width of sider to align properly
+		boardLst = [[" "]*len(sider[0]) + row for row in headerLst] + boardLst
 
-		for x in range(1, self.rows + 1):
-			# Same comments as above...
-			xAsStr = "{x: >{width}}".format(x=x, width=border['sider'] - 1)
-			for y in range(1, border['sider']):
-				boardLst[border['header'] + x - 1][y - 1] = borderText(xAsStr[y - 1])
-			boardLst[border['header'] + x - 1][border['sider'] - 1] = borderText(siderSpacer)
+		if debug == True:
+			print("final board as string:")
+			print(lst2str(boardLst))
 
-		# Change top left corner between borders to whitespace
-		for row in range(0, border['header']):
-			for col in range(0, border['sider']):
-				boardLst[row][col] = " "
-
-		# Add ships to board
-		# Loop through all ships on board
-		print("Updating all board locations with ships")
-		for i, ship in enumerate(self.ships):
-			# Define display formats:
-			# charShip[0] is for tiles yet to be hit, [1] for tiles hit
-			# Update: ship.coords loop below now bypasses charShip when
-			# boardview==0 and ship is not sunk (ship identity shouldn't be
-			# available if ship is only partially hit).  There's probably a
-			# better way to do this, but I didn't bother...
-			# TODO: This section doesn't actually do anything if ship isn't hit.  Update this method.
-
-			charShip = ["", ""]
-			if boardView == 0: # Ship identity always visible
-				if shipView == 0:  # Ship identified by numeric ID
-					charShip[0] = Fore.YELLOW + str(i) + Style.RESET_ALL
-					charShip[1] = Fore.RED + str(i) + Style.RESET_ALL
-				elif shipView == 1:# Ship identified by character type
-					charShip[0] = Fore.YELLOW + ship.boardID + Style.RESET_ALL
-					charShip[1] = Fore.RED + ship.boardID + Style.RESET_ALL
-			elif boardView == 1: # Ship identity hidden unless destroyed
-				if shipView == 0:  # Ship identified by numeric ID
-					charShip[0] = charUnknown
-					charShip[1] = Fore.RED + str(i) + Style.RESET_ALL
-				elif shipView == 1:# Ship identified by character type
-					charShip[0] = charUnknown
-					charShip[1] = Fore.RED + ship.boardID + Style.RESET_ALL
-
-			# For all ship hits, update the board.  If:
-			# 	boardView==0 : show the ship ID char or ID number
-			#	boardView==1 && ship==sunk:  show the ship ID char or ID number
-			#	else: show  charUnknownHit
-			# Loop through ships coordinates
-			for j, coord in enumerate(ship.coords):
-				# If this coordinate was hit, update tile
-				if ship.hits[j] == 1:
-					if boardView == 0 or (boardView == 1 and ship.getHealth()[0] == 0):
-						boardLst[coord[0] - 1 + border['header']][coord[1] - 1 + border['sider']] = charShip[
-							ship.hits[j]]
-					else:
-						boardLst[coord[0] - 1 + border['header']][coord[1] - 1 + border['sider']] = charUnknownHit
-				# TODO: Need something here to actually print if ship isn't hit
-
-
-
-		# Add water hits to board
-		charWaterHit = Fore.BLUE + "X" + Style.RESET_ALL
-		for coord in self.waterhits:
-			boardLst[coord[0] - 1 + border['header']][coord[1] - 1 + border['sider']] = charWaterHit
-
-		# Assemble boardLst into string for output
-		# Update adding board's name to output at the start of the print:
-		# boardStr = ""
-		boardStr = "Board: " + self.name + "\n"
-		for row in boardLst:
-			boardStr = boardStr + ("".join(row)) + "\n"
-
-		return boardStr
+		return lst2str(boardLst)
 
 	def __repr__(self):
 		"""
@@ -223,7 +221,7 @@ class Board(object):
 		"""
 
 		# Use display method to create god-mode output using ship indices
-		return self.display(0, 0)
+		return self.display(visible="all", sDisp="type")
 
 	# getHealth, for a given board, returns:
 	#   [hitsRemaining, hitsTaken] where:
@@ -250,7 +248,7 @@ class Board(object):
 	# addShip method accepts an existing ship class and adds it to the board.
 	# The method also checks to make sure the ship is on the board and does not
 	# does not overlap with any existing ships
-	def addShip(self, ship, debug=False):
+	def addShip(self, ship, debug = False):
 		"""
 		Accepts a Ship object and adds it to the board, checking whether ship placement is valid (on board, no overlap)
 
@@ -324,14 +322,63 @@ class Board(object):
 			print(self.shipMap)
 
 
-	def takeFire(self, fireCoord, debug=False):
+	def takeFire(self, debug = False):
+		"""
+		Provides a text prompt to the user for firing.  Continues to loop until valid shot registered.
+
+		:param debug:
+		:return:
+		"""
+		print("Firing on board {}:".format(self.name))
+		print(self)
+		print()
+		print("Where would you like to fire?")
+
+		# Continue taking targets until a valid one is entered
+		while True:
+			# Reinitialize coord (so last iterations coord doesn't get used)
+			coord = []
+			try:
+				coord = (int(input("Row: ")), int(input("Col: ")))
+			except ValueError:
+				print("Invalid target - row/col must be integers")
+				continue
+
+			try:
+				hitIndex = self.processFire(coord)
+			except FireOutsideBoard as e:
+				print("Invalid shot - ({},{}) is not on the board".format(coord[0],coord[1]))
+				if debug == True:
+					print(str(e))
+				continue
+			except FireRedundant as e:
+				print("Invalid shot - ({},{}) has already been hit".format(coord[0],coord[1]))
+				if debug == True:
+					print(str(e))
+				continue
+
+			# Check to see how the shot turned out
+			# -1 indicates no hits
+			if hitIndex == -1:
+				print("Miss!")
+				break
+			else:
+				# Check the health of the ship that was hit.  Broadcast
+				# identity if sunk
+				shipHealth = self.ships[hitIndex].getHealth()
+				if shipHealth["remaining"] > 0:
+					print("HIT!  You've hit an unknown ship.")
+				else:
+					print("You've hit and sunk {}!".format(self.ships[hitIndex].name))
+				break
+
+	def processFire(self, fireCoord, debug=False):
 		"""
 		Accepts a tuple coordinate that is being shot at, determines if there is a ship at that coordinate, and updates the ship/water hits accordingly.
 
 		Return values are:
-		-	N (>1): index of the ship hit
+		-	N (>0): index of the ship hit
 		-	-1: indicates a miss
-		-	-2: indicates a repeated shot (water or ship hit)
 
 		Exceptions are raised if
 		-   FireOutsideBoard - fireCoord is not within the board
@@ -354,7 +401,7 @@ class Board(object):
 			print("Board {} taking fire at coord {}".format(self.name, fireCoord))
 
 		# Check if fireCoord is within board
-		if (fireCoord[0] > self.rows or fireCoord[0] < 1 or fireCoord[1] > self.cols or fireCoord[1] < 1):
+		if (fireCoord[0] >= self.rows or fireCoord[0] < 0 or fireCoord[1] >= self.cols or fireCoord[1] < 0):
 			message = "({},{}) is outside board ({} rows, {} cols)".format(fireCoord[0], fireCoord[1], self.rows,
 			                                                               self.cols)
 			raise FireOutsideBoard(message)
@@ -363,7 +410,7 @@ class Board(object):
 		# Loop through ships to see if any are hit
 		for i, ship in enumerate(self.ships):
 			try:
-				# ship.takeFire returns the ship's index that was hit if a hit,
+				# ship.processFire returns the ship's index that was hit if a hit,
 				# otherwise it returns -1 for a miss or an exception if this shot
 				# is redundant
 				hitthis = ship.takeFire(fireCoord)
@@ -415,6 +462,65 @@ class Board(object):
 		if not value > valueMin:
 			raise NotEnoughRows("Must have more than {} cols".format(valueMin))
 		self._cols = value
+
+###########################
+# Helper Functions
+###########################
+def makeHeader(headings, spacer = None, empty = " "):
+	"""
+	Generate a header with each element of heading printed vertically in a column.
+
+	For function call:
+	makeHeader([0,1,2,3,4,5,6,7,8,9,10,11,12,13], spacer='-', empty='x')
+	Output is a 2D list like:
+		xxxxxxxxxx1111      <--tens (x's are empty char)
+		01234567890123      <--ones
+		--------------      <--spacer
+	Headings can also be strings or floating point numbers
+
+	:param headings: List of headings (strings, numbers)
+	:param spacer: Character to use as a spacer (if len(spacer)>1, characters will be printed in sequence)
+	:param empty: Character to use as filler for all empty space (must be single character)
+	:return: 2D list
+	"""
+	if not len(str(empty)) == 1:
+		raise ValueError("Input argument \"empty\" must be single character")
+	else:
+		empty = str(empty)
+
+	# Convert headings into all strings
+	headings = [str(x) for x in headings]
+
+	# Define size of array.  rows is max heading length, cols is number of headings
+	rows = max([len(x) for x in headings])
+	cols = len(headings)
+
+	# Initialize return list
+	headerLst = [[empty for x in range(cols)] for y in range(rows)]
+
+	# Fill heading numbers into return list
+	for j,head in enumerate(headings):
+		revhead = head[::-1]
+
+		for i,char in enumerate(revhead):
+			headerLst[-1 - i][j] = char
+
+	# Add spacer if required
+	if not spacer == None:
+		for char in spacer:
+			headerLst.append([char for x in range(cols)])
+
+	return headerLst
+
+def lstTranspose(lst):
+	"""
+	Transposes a 2D list
+
+	:param lst:  2D list to transpose
+	:return: Transpose of the input lst
+	"""
+	return [[lst[row][col] for row in range(0,len(lst))] for col in range(0,len(lst[0]))]
+
 
 
 ###########################
@@ -481,73 +587,43 @@ if __name__ == '__main__':
 	print(myBoard)
 	print()
 
-	print("Make a 15x12 board with a name:")
-	try:
-		myBoard2 = Board(15,12, name="Andrew")
-	except NotEnoughRows as e:
-		print("Caught exception: " + str(e))
-		sys.exit(1) #just some error code
-	except NotEnoughCols as e:
-		print("Caught exception: " + str(e))
-		sys.exit(1) #just some error code
-
-	print(myBoard2)
-	print()
-
-	print("Make a 4x6 board")
-	try:
-		myBoard3 = Board(4,6)
-	except NotEnoughRows as e:
-		print("Caught exception: " + str(e))
-	except NotEnoughCols as e:
-		print("Caught exception: " + str(e))
-
-	try:
-		print(myBoard3)
-	except Exception as e:
-		print("Can't print myBoard3")
-
 
 	###########################
 	# Place ships on the boards
 	###########################
 	# Make some ships
 	print("Make some ships:")
-	bShip1 = Battleship("Battleship1")
-	coords = [(2,i) for i in range(1,bShip1.length+1)]
-	bShip1.placeShip(coords)
-	print(bShip1)
-	bShip2 = Battleship("Battleship1")
-	coords = [(3,i) for i in range(1,bShip2.length+1)]
-	bShip2.placeShip(coords)
-	print(bShip2)
+	ships = []
+	ships.append(Battleship("Battleship1"))
+	ships[-1].placeShip([(2,i) for i in range(1,ships[-1].length+1)])
+	ships.append(Submarine("Sub1"))
+	ships[-1].placeShip([(3,i) for i in range(1,ships[-1].length+1)])
+
+	for i,ship in enumerate(ships):
+		print("Ship {}:".format(i))
+		print(ship)
+	print()
 
 	# Add ships to board
 	print("Add ships to board:")
-	myBoard.addShip(bShip1,debug=True)
-	myBoard.addShip(bShip2,debug=True)
-	print("Print the board with god-mode vision")
-	print(myBoard.display(0,0))
-	print(myBoard.shipMap)
-	# print(myBoard.display(1,0))
-	# print(myBoard.display(0,1))
-	# print(myBoard.display(1,1))
+	for ship in ships:
+		myBoard.addShip(ship)
+	print()
+	#
+	# print("Print the board:")
+	# print("shipMap:")
+	# print(myBoard.shipMap)
+	# print()
 
+	print("Fire at some ships and see if it shows up correctly in display")
+	while True:
+		myBoard.takeFire()
+		# print(myBoard)
+		print()
 
-	# # Initialize some ships
-	# ships.append(Battleship("Mr. Battleship"))
-	# ships.append(Submarine("Mrs. Submarine"))
-	# ships.append(HugeShip("Dr. HugeShip"))
-	#
-	# printShips(ships)
-	#
-	# print("")
-	# print("Placing the ships.")
-	# # Place the battleship arbitrarily
-	# coords = [(0,i) for i in range(0,5)]
-	# ships[0].placeShip(coords)
-	#
-	# # Place the submarine using getStraightCoord
-	# dir = "R"
-	# coords = ships[1].getStraightCoords((1,0),dir)
-	# ships[1].placeShip(coords)
+		for visible in ["all", "revealed"]:
+			for sDisp in ["ID", "type"]:
+				print("{} / {}".format(visible, sDisp))
+				print(myBoard.display(visible=visible, sDisp=sDisp))
+				input("pause here")
+		print()
