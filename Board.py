@@ -1,10 +1,10 @@
 import sys
 import copy
-from Ship import Ship, Battleship, Submarine, HitDuplicate
+from Ship import Ship, Battleship, Submarine, HitDuplicate, getShipTypes, getShipClasses
 from lst2str import lst2str
 from printArgs import printArgs
 from Coord import Coord
-
+from chooseFromList import chooseFromList
 
 # To color text on the board
 from colorama import init, Fore, Style
@@ -223,10 +223,59 @@ class Board(object):
 		# Use display method to create god-mode output using ship indices
 		return self.display(visible="all", sDisp="type")
 
-	# getHealth, for a given board, returns:
-	#   [hitsRemaining, hitsTaken] where:
-	#	hitsRemaining is the sum of hits remaining for all ships on the board
-	#	hitsTaken is the sum of hits taken by all the ships on the board
+
+	def setShips(self, ships = None, shipTypes = None, debug = True):
+		"""
+
+		:param ships:
+		:param shipTypes:
+		:param debug:
+		:return:
+		"""
+		if debug == True:
+			printArgs(exclude=['self'])
+
+		if ships == None:
+			# If shipTypes is not specified, prompt user for the types to be placed
+#			shipClasses = getShipClasses()
+			shipClasses = {shipClass.__name__: shipClass for shipClass in getShipClasses()}
+			if shipTypes == None:
+				# Storage for ship types to be placed (stored as the class
+				# objects)
+				shipTypes = []
+
+				# Loop
+				while True:
+					userStop = "No more ships"
+					newShip = chooseFromList("Choose a type of ship to place on the board:", choices = sorted(shipClasses.keys()), nullChoice = userStop)
+					if newShip is userStop:
+						if len(shipTypes) == 0:
+							print("You must choose at least one ship")
+							continue
+						else:
+							print("Finished choosing ships.")
+						break
+					else:
+						shipTypes.append(shipClasses[newShip])
+
+				if debug == True:
+					print("shipTypes interactively chosen to be:")
+					print(shipTypes)
+			else:
+				# TODO: inspect shipTypes.  If list of ship type names and not classes, convert to classes
+				# Use the shipClasses dictionary from above
+				shipTypes = [shipClasses[shipType] for shipType in shipTypes]
+
+			if debug == True:
+				print("shipTypes:")
+				print(shipTypes)
+
+			#TODO: Generate ships from shipTypes
+			# Should ships have coordinates set here?  I think they have to
+			# since the next thing down the line would be populateBoard
+			# SHould this function be renamed something like setupBoard?  It
+			# really is more general.  At the least the setShips is a bad name
+
 	def getHealth(self):
 		"""
 		Returns for this board the sum of the hits remaining for all ships and the hits taken by all ships as a list.
@@ -607,16 +656,21 @@ if __name__ == '__main__':
 	# print("shipMap:")
 	# print(myBoard.shipMap)
 	# print()
+	#
+	# print("Fire at some ships and see if it shows up correctly in display")
+	# while True:
+	# 	myBoard.interactiveFire()
+	# 	# print(myBoard)
+	# 	print()
+	#
+	# 	for visible in ["all", "revealed"]:
+	# 		for sDisp in ["ID", "type"]:
+	# 			print("{} / {}".format(visible, sDisp))
+	# 			print(myBoard.display(visible=visible, sDisp=sDisp))
+	# 			input("pause here")
+	# 	print()
 
-	print("Fire at some ships and see if it shows up correctly in display")
-	while True:
-		myBoard.interactiveFire()
-		# print(myBoard)
-		print()
 
-		for visible in ["all", "revealed"]:
-			for sDisp in ["ID", "type"]:
-				print("{} / {}".format(visible, sDisp))
-				print(myBoard.display(visible=visible, sDisp=sDisp))
-				input("pause here")
-		print()
+	myBoard.setShips()
+	myBoard.setShips(shipTypes = ["Battleship", "Submarine"])
+	myBoard.setShips(shipTypes = ["Battleship", "Submarine", "Faries"])
