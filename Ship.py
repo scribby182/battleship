@@ -305,6 +305,18 @@ class InvalidCoord(Exception):
 		return repr(self.value)
 
 
+def getShipTypes():
+	"""
+	Returns a list of the names of available ship types
+	"""
+	return [subClass.__name__ for subClass in Ship.__subclasses__()]
+def getShipClasses():
+	"""
+	Returns a list of the available ship objects
+	"""
+	return [subClass for subClass in Ship.__subclasses__()]
+
+
 ###########################
 # Test code for the methods
 ###########################
@@ -380,10 +392,20 @@ if __name__ == '__main__':
 	#
 	# printShips(ships)
 
-	print("Test interactively placing ship")
-	for ship in ships:
-		print("Place ship {}".format(ship.name))
-		ship.setCoords()
+	# print("Test interactively placing ship")
+	# for ship in ships:
+	# 	print("Place ship {}".format(ship.name))
+	# 	ship.setCoords()
+
+	print("Test getShipTypes:")
+	print(getShipTypes())
+	print("Test getShipClasses:")
+	shipClasses = getShipClasses()
+	for shipClass in shipClasses:
+		print(shipClass.__name__)
+
+	dynamicShip = shipClasses[0]("{} 1".format(shipClasses[0].__name__))
+	print(dynamicShip)
 
 	print("done Ship.py debug __main__")
 
