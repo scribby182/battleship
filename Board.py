@@ -1,10 +1,13 @@
 import sys
 import copy
-from Ship import Ship, Battleship, Submarine, HitDuplicate, getShipTypes, getShipClasses
+from Player import Player
+from Ship import Ship, Battleship, Submarine, HitDuplicate, getShipTypes, getShipClasses, shipType2Ship
 from lst2str import lst2str
 from printArgs import printArgs
 from Coord import Coord
 from chooseFromList import chooseFromList
+from random import randint
+
 
 # To color text on the board
 from colorama import init, Fore, Style
@@ -224,83 +227,97 @@ class Board(object):
 		return self.display(visible="all", sDisp="type")
 
 
-	def shipType2Ship(self, shipTypes = None, debug = True):
+	def populateBoard(self, ships, random = False, debug = False):
 		"""
-		Returns a list of Ship instances given either a list of Ship subclass
-		references, a list of Ship subclass names, or Ship subclasses chosen by
-		user prompts
+		Populate a board given a list of ships.
 
-		:param shipTypes: (optional) List of ship subclasses or strings of the
-						  names of ship subclasses (can be mixture of both)
-		:param debug: Boolean for debug printing
-		:return: List of isntances of Ship subclasses requested
+		:param ships:
+		:return:
 		"""
-		if debug == True:
-			printArgs(exclude=['self'])
 
-		# If shipTypes is not specified, use shipTypes prompt user for the types to be placed
-		# getShipClasses returns the ship subclass objects available.  Form
-		# a dictionary with keys of the subclass names for use below.
-		shipSubclasses = {shipClass.__name__: shipClass for shipClass in getShipClasses()}
-		if shipTypes == None:
-			# Storage for ship types to be placed (stored as the class
-			# objects)
-			shipTypes = []
+		# Loop through ships.
+		# If random == True, place ships randomly.
+		# If random == False, use ship.setCoords(ship.getStraightCoords()) method to place ships
+		# interactively.
 
-			# Promprt user for shipType input.  Loop until finished
-			while True:
-				userStop = "No more ships"
-				newShip = chooseFromList("Choose a type of ship to place on the board:", choices = sorted(shipSubclasses.keys()), nullChoice = userStop)
-				if newShip is userStop:
-					if len(shipTypes) == 0:
-						print("You must choose at least one ship")
+		for ship in ships:
+			if random:
+				# Place ship randomly by:
+				# Looping through shipmap to find valid origin/direction combos
+				#	- NOTE: This was the original plan - implementation was slightly
+				#	  different.
+				#	- Start at (0,0) loop through each row left to right
+				#	- For each element that has at least (ship.length-1) coords to
+				#	its right, check if they are all -1 (empty).  If they are, store
+				#	[origin,"R"] as a potential placement
+				#	- For each element that has at least (ship.length-1) coords
+				#	below it, check if they are all -1 (empty) and store if true
+				#	- NOTE: I do not look left or up because, as I'm searching from
+				#	top left to bottom right in order, and these would be redundant.
+				#	I THINK this doesn't have any systematic bias, but didn't bother
+				# 	to prove it.
+				#	- Randomly choose one of the valid placements as the ship's
+				#	location, place the ship (catch errors just in case), and move
+				#	to next.
+				#	- If no room for ship, error out(?)
+				print()
+				print("Placing ship {} randomly".format(ship.name))
+				availableSpaces = []
+				# Find all valid places for this ship.
+				for i in range(0, myBoard.rows):
+					for j in range(0, myBoard.cols):
+						if debug == True:
+							print("Checking ({},{})".format(i,j))
+						# Check if this works for the ship placed to the right
+						if checkLineVal(myBoard.shipMap, (i, j), -1, ship.length, (0, 1), False):
+							if debug == True:
+								print("({},{},R) passed!".format(i,j))
+							availableSpaces.append((i, j, "R"))
+						# Check if this works for the ship placed down
+						if checkLineVal(myBoard.shipMap, (i, j), -1, ship.length, (1, 0), False):
+							if debug == True:
+								print("({},{},D) passed!".format(i,j))
+							availableSpaces.append((i, j, "D"))
+				if debug == True:
+					# Display valid spaces
+					print("Ship can be placed randomly within:")
+					print(availableSpaces)
+
+				# Choose one space within available spaces, then place ship
+				if len(availableSpaces) < 1:
+					raise Exception("No valid spaces available for ship {}".format(ship.name))
+				space = randint(0, len(availableSpaces) - 1)
+				if debug == True: print("Trying to place {} at ({},{}) {}".format(ship.name, *availableSpaces[space]))
+
+				origin = (availableSpaces[space][0], availableSpaces[space][1])
+				direction = availableSpaces[space][2]
+				ship.setCoords(ship.getStraightCoords(origin, direction))
+				myBoard.addShip(ship)
+				print("Ship {} placed randomly at ({},{}) {}".format(ship.name, *availableSpaces[space]))
+
+			else:
+				while True:
+					print()
+					print("Please place your ship {} (length {}) on the board: ".format(ship.name, ship.length))
+					print(self)
+					# Place ship until valid place chosen
+					ship.setCoords(coords = ship.getStraightCoords())
+					try:
+						myBoard.addShip(ship)
+					except InvalidShipPlacement as e:
+						# If something goes wrong, print the exception and ask
+						# for placement again
+						print(e.value + " - Please try again.")
+						# for stuff in dir(e):
+						# 	print("{}: {}".format(stuff,e.__getattribute__(stuff)))
+						# print(dir(e))
 						continue
-					else:
-						print("Finished choosing ships.")
+					# If you get here, the ship is placed!
 					break
-				else:
-					shipTypes.append(shipSubclasses[newShip])
 
 			if debug == True:
-				print("shipTypes interactively chosen to be:")
-				print(shipTypes)
-		else:
-			# Ensure all shipTypes elements are Ship subclasses.
-			# Convert any that aren't Ship subclasses by name using dict.
-			# This nice list comprehension doesn't work becasue issubclass
-			# raises a TypeError if shipType is not a class :(
-			# Thought of instead using shipType.__class__, but the
-			# __class__ arrtribute of a class object (the class, not the
-			# instance), is list(?!?!)
-			# shipTypes = [shipType if issubclass(shipType, Ship) else shipSubclasses[shipType] for shipType in shipTypes]
-			validatedShipTypes = [None] * len(shipTypes)
-			for i,shipType in enumerate(shipTypes):
-				try:
-					if issubclass(shipType, Ship):
-						validatedShipTypes[i] = shipType
-						if debug == True:
-							print("Found shipType that is subclass of Ship.  Storing into shipTypes")
-				except TypeError:
-					validatedShipTypes[i] = shipSubclasses[shipType]
-					if debug == True:
-						print("Found shipType that is name of Ship subclass in shipSubclasses.  Storing into shipTypes")
-			shipTypes = validatedShipTypes
-
-
-		if debug == True:
-			print("shipTypes:")
-			print(shipTypes)
-
-		# Make a list of instances of ships as specified by shipTypes
-		ships = [ship(ship.__name__) for ship in shipTypes]
-
-		if debug == True:
-			print("automatically generated ships from shipTypes")
-			for ship in ships:
-				print(ship)
-
-		return ships
-
+				print("Board after placing ship {}: ".format(ship.name))
+				print(myBoard)
 
 	def getHealth(self):
 		"""
@@ -314,11 +331,11 @@ class Board(object):
 		hitsTaken = 0
 
 		for ship in self.ships:
-			[tempHitsRemaining, tempHitsTaken] = ship.getHealth()
-			hitsRemaining = hitsRemaining + tempHitsRemaining
-			hitsTaken = hitsTaken + tempHitsTaken
+			shipHealth = ship.getHealth()
+			hitsRemaining = hitsRemaining + shipHealth["remaining"]
+			hitsTaken = hitsTaken + shipHealth["remaining"]
 
-		return [hitsRemaining, hitsTaken]
+		return {"taken": hitsTaken, "remaining": hitsRemaining}
 
 	# addShip method accepts an existing ship class and adds it to the board.
 	# The method also checks to make sure the ship is on the board and does not
@@ -365,17 +382,17 @@ class Board(object):
 				print("Trying to place ship {} at coord {}".format(ship.name, coord))
 			# Check if row is inside board
 			if (coord.x < 0 or coord.x >= self.rows):
-				raise InvalidShip("New ship {0} must be within board ( 0 <= row <= {1}".format(ship.name, self.rows - 1))
+				raise InvalidShipPlacement("New ship {0} must be within board".format(ship.name, self.rows - 1))
 			# Check if col is inside board
 			elif (coord.y < 0 or coord.y >= self.cols):
-				raise InvalidShip("New ship {0} must be within board ( 0 <= col <= {1}".format(ship.name, self.cols - 1))
+				raise InvalidShipPlacement("New ship {0} must be within board".format(ship.name, self.cols - 1))
 			# Check if coordinate is already taken
 			# TODO: Is there another way for this? Not sure if this actually works. And shipMap hasn't been used much elsewhere
 			# TODO: Check if placing overlaping ships raises error like it should
 			elif tempShipMap[coord.x][coord.y] >= 0:
 				overlapShipNum = tempShipMap[coord.x][coord.y]
 				overlapShipName = self.ships[overlapShipNum].name
-				raise InvalidShip("New ship {0} overlaps previous ship {1} (ID: {2})".format(ship.name, overlapShipName,
+				raise InvalidShipPlacement("New ship {0} overlaps previous ship {1} (ID: {2})".format(ship.name, overlapShipName,
 				                                                                           overlapShipNum))
 			# If nothing went wrong, place this pip of the ship.
 			else:
@@ -598,10 +615,50 @@ def lstTranspose(lst):
 
 
 
+def checkLineVal(array, coord, value, num=0, incr=(1,0), debug = False):
+	"""
+	Subroutine checks if "coord" (format (i,j)) and its "num" neighbours, each
+	spaced by "incr" (which is also in (delta_i,delta_j) format) in
+	array (2D) are equal to "value"
+	:param array: 2D list of values
+	:param coord: Starting coordinate for the search
+	:param value: Value to check for at each element
+	:param num: Number of increments to check at from coord (num=0 checks only coord)
+	:param incr: Increment to jump for each check (incr=(3,-2) would move down three rows and left two columns)
+	:param debug: Debug printing
+	:return:
+	"""
+	if debug == True: print("Check if coord ({},{}) == {}, num = {}, incr = ({},{})".format(coord[0],coord[1],value,num,incr[0],incr[1]))
+
+	if coord[0] < 0 or coord[0] >= len(array):
+		if debug == True: print("coord[0] outside row bounds of array")
+		return 0
+	elif coord[1] < 0 or coord[1] >= len(array[0]):
+		if debug == True: print("coord[1] outside row bounds of array")
+		return 0
+	elif num > 0:
+		if array[coord[0]][coord[1]] == value and checkLineVal(array, (coord[0]+incr[0], coord[1]+incr[1]), value, num-1, incr, debug):
+			return 1
+		else:
+			return 0
+	elif num == 0:
+		if array[coord[0]][coord[1]] == value:
+			return 1
+		else:
+			return 0
+
+
 ###########################
 # Exceptions
 ###########################
 class InvalidShip(Exception):
+	def __init__(self, value):
+		self.value = value
+
+	def __str__(self):
+		return repr(self.value)
+
+class InvalidShipPlacement(Exception):
 	def __init__(self, value):
 		self.value = value
 
@@ -660,23 +717,23 @@ if __name__ == '__main__':
 	# Place ships on the boards
 	###########################
 	# Make some ships
-	print("Make some ships:")
-	ships = []
-	ships.append(Battleship("Battleship1"))
-	ships[-1].setCoords([(2, i) for i in range(1, ships[-1].length + 1)])
-	ships.append(Submarine("Sub1"))
-	ships[-1].setCoords([(3, i) for i in range(1, ships[-1].length + 1)])
-
-	for i,ship in enumerate(ships):
-		print("Ship {}:".format(i))
-		print(ship)
-	print()
-
-	# Add ships to board
-	print("Add ships to board:")
-	for ship in ships:
-		myBoard.addShip(ship)
-	print()
+	# print("Make some ships:")
+	# ships = []
+	# ships.append(Battleship("Battleship1"))
+	# ships[-1].setCoords([(2, i) for i in range(1, ships[-1].length + 1)])
+	# ships.append(Submarine("Sub1"))
+	# ships[-1].setCoords([(3, i) for i in range(1, ships[-1].length + 1)])
+	#
+	# for i,ship in enumerate(ships):
+	# 	print("Ship {}:".format(i))
+	# 	print(ship)
+	# print()
+	#
+	# # Add ships to board
+	# print("Add ships to board:")
+	# for ship in ships:
+	# 	myBoard.addShip(ship)
+	# print()
 	#
 	# print("Print the board:")
 	# print("shipMap:")
@@ -701,17 +758,65 @@ if __name__ == '__main__':
 	print(Battleship)
 	print(issubclass(Battleship,Ship))
 
-
-	# print("Test setShips interactively")
-	# myBoard.setShips()
+	# NOTE: shipType2Ship was at one point part of Board(), but it was moved
+	# to the more logical placement as a Ship module method
+	# print("Test shipType2Ship interactively")
+	# shipType2Ship()
 	print()
-	print("Test setShips by name")
-	myBoard.setShips(shipTypes = ["Battleship", "Submarine"])
-	print()
-	print("Test setShips by object")
-	myBoard.setShips(shipTypes = [Battleship, Submarine])
-	print()
-	# print("Test setShips with incorrect shipType name")
-	# myBoard.setShips(shipTypes = ["Battleship", "Submarine", "Faries"])
+	print("Test shipType2Ship by name")
+	someShips = []
+	someShips.append(shipType2Ship(shipTypes = ["Battleship", "Submarine"]))
+	# print(someShips)
 	# print()
+	# print("Test setShips by object")
+	# someShips.append(shipType2Ship(shipTypes = [Battleship, Submarine]))
+	# # print(someShips)
+	# print()
+	# print("Test shipType2Ship with incorrect shipType name")
+	# someShips.append(shipType2Ship(shipTypes = ["Battleship", "Submarine", "Faries"]))
+	# print(someShips)
+	# print()
+	#
+	# print("Test Board.populateBoard()'s interactive placement")
+	# print("Board before adding more ships")
+	# print(myBoard)
+	# print()
+	# for ships in someShips:
+	# 	myBoard.populateBoard(ships, debug=True)
+	# 	print("Board is now: ")
+	# 	print(myBoard)
+	# 	print()
 
+	print("Test Board.populateBoard()'s random placement")
+	print("Board before adding more ships")
+	print(myBoard)
+	print()
+	for ships in someShips:
+		myBoard.populateBoard(ships, random=True)
+		print("Board is now: ")
+		print(myBoard)
+		print()
+
+
+	print("Test making players and firing between them")
+	players = []
+	for i in range(2):
+		print("Making player {}".format(i))
+		players.append(Player("Player {}".format(i)))
+		print("Adding board to player {}".format(i))
+		players[-1].setBoard(copy.deepcopy(myBoard))
+
+	print("Assigning opponents to players")
+	players[0].setOpponent(players[1])
+	# players[1].setOpponent(players[0])
+	print("Assigning opponents to players complete")
+	print()
+
+	print("Printing players")
+	for player in players:
+		print("Printing player {}".format(player.name))
+		print(player)
+		print()
+
+	while players[0].opponent.board.getHealth()["remaining"] > 0:
+		players[0].fire()
