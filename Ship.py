@@ -53,7 +53,7 @@ class Ship(object):
 		return "{shipClass:<12} ({ID}): {name}\nLength          : {length}\nLocation        : {location}\n{hitHeader:<16}: {hits}".format(shipClass=self.shipClass, ID=self.boardID, name=self.name, length=self.length, location=coordsStr, hitHeader="Hits:", hits=hitsStr)
 
 
-	def setCoords(self, coords = None, debug = True):
+	def setCoords(self, coords = None, debug = False):
 		"""
 		Method for setting the coordinates of a ship.
 		:param coords: list of tuples or Coord objects.  Tuples will be converted internally to Coord objects.
@@ -315,6 +315,90 @@ def getShipClasses():
 	Returns a list of the available ship objects
 	"""
 	return [subClass for subClass in Ship.__subclasses__()]
+
+###########################
+# Module Methods
+###########################
+def shipType2Ship(shipTypes=None, debug=True):
+	"""
+	Returns a list of Ship instances given either a list of Ship subclass
+	references, a list of Ship subclass names, or Ship subclasses chosen by
+	user prompts
+
+	:param shipTypes: (optional) List of ship subclasses or strings of the
+					  names of ship subclasses (can be mixture of both)
+	:param debug: Boolean for debug printing
+	:return: List of isntances of Ship subclasses requested
+	"""
+	if debug == True:
+		printArgs(exclude=['self'])
+
+	# If shipTypes is not specified, use shipTypes prompt user for the types to be placed
+	# getShipClasses returns the ship subclass objects available.  Form
+	# a dictionary with keys of the subclass names for use below.
+	shipSubclasses = {shipClass.__name__: shipClass for shipClass in
+	                  getShipClasses()}
+	if shipTypes == None:
+		# Storage for ship types to be placed (stored as the class
+		# objects)
+		shipTypes = []
+
+		# Promprt user for shipType input.  Loop until finished
+		while True:
+			userStop = "No more ships"
+			newShip = chooseFromList(
+				"Choose a type of ship to place on the board:",
+				choices=sorted(shipSubclasses.keys()), nullChoice=userStop)
+			if newShip is userStop:
+				if len(shipTypes) == 0:
+					print("You must choose at least one ship")
+					continue
+				else:
+					print("Finished choosing ships.")
+				break
+			else:
+				shipTypes.append(shipSubclasses[newShip])
+
+		if debug == True:
+			print("shipTypes interactively chosen to be:")
+			print(shipTypes)
+	else:
+		# Ensure all shipTypes elements are Ship subclasses.
+		# Convert any that aren't Ship subclasses by name using dict.
+		# This nice list comprehension doesn't work becasue issubclass
+		# raises a TypeError if shipType is not a class :(
+		# Thought of instead using shipType.__class__, but the
+		# __class__ arrtribute of a class object (the class, not the
+		# instance), is list(?!?!)
+		# shipTypes = [shipType if issubclass(shipType, Ship) else shipSubclasses[shipType] for shipType in shipTypes]
+		validatedShipTypes = [None] * len(shipTypes)
+		for i, shipType in enumerate(shipTypes):
+			try:
+				if issubclass(shipType, Ship):
+					validatedShipTypes[i] = shipType
+					if debug == True:
+						print(
+							"Found shipType that is subclass of Ship.  Storing into shipTypes")
+			except TypeError:
+				validatedShipTypes[i] = shipSubclasses[shipType]
+				if debug == True:
+					print(
+						"Found shipType that is name of Ship subclass in shipSubclasses.  Storing into shipTypes")
+		shipTypes = validatedShipTypes
+
+	if debug == True:
+		print("shipTypes:")
+		print(shipTypes)
+
+	# Make a list of instances of ships as specified by shipTypes
+	ships = [ship(ship.__name__) for ship in shipTypes]
+
+	if debug == True:
+		print("automatically generated ships from shipTypes")
+		for ship in ships:
+			print(ship)
+
+	return ships
 
 
 ###########################
